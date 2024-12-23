@@ -13,12 +13,19 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.barappv2.viewmodel.TableViewModel
+import com.example.barappv2.data.Table
 
-data class Table(val id: Int, val name: String, var value: Float = 0f)
 data class Section(val name: String, val tables: List<Table>, var isExpanded: Boolean = false)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,25 +33,8 @@ data class Section(val name: String, val tables: List<Table>, var isExpanded: Bo
 fun MainScreen() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
-
-    // Placeholder section data
-    val sections = remember {
-        mutableStateListOf(
-            Section("Section 1", listOf(
-                Table(1, "Table 1"),
-                Table(2, "Table 2"),
-                Table(3, "Table 3"),
-                Table(4, "Table 4")
-            )),
-            Section("Section 2", listOf(
-                Table(5, "Table 5"),
-                Table(6, "Table 6"),
-                Table(7, "Table 7"),
-                Table(8, "Table 8"),
-                Table(9, "Table 9")
-            ))
-        )
-    }
+    val navController = rememberNavController()
+    val viewModel: TableViewModel = viewModel()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -54,8 +44,16 @@ fun MainScreen() {
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                Text("Settings", style = MaterialTheme.typography.titleLarge)
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text("Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable {
+                    coroutineScope.launch { drawerState.close() }
+                    navController.navigate("settings")
+                })
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                Text("Database", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable {
+                    coroutineScope.launch { drawerState.close() }
+                    navController.navigate("database")
+                })
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
                 Text("History", style = MaterialTheme.typography.titleLarge)
             }
         }
@@ -74,19 +72,73 @@ fun MainScreen() {
                 )
             },
             content = { paddingValues ->
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .fillMaxSize()
+                Box(modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
                 ) {
-                    items(sections) { section ->
-                        SectionItem(section)
+                    NavHost(navController, startDestination = "home", modifier = Modifier.fillMaxSize()) {
+                        composable("home") {
+                            HomeScreen(viewModel)
+                        }
+                        composable("settings") {
+                            SettingsScreen(viewModel)
+                        }
+                        composable("database") {
+                            DatabaseScreen(viewModel)
+                        }
                     }
                 }
             }
         )
     }
 }
+
+@Composable
+fun HomeScreen(viewModel: TableViewModel) {
+    // Retrieve sections and tables data
+    val sections = remember {
+        mutableStateListOf(
+            Section("Section 1", listOf(
+                Table(1, "Table 1"),
+                Table(2, "Table 2"),
+                Table(3, "Table 3"),
+                Table(4, "Table 4")
+            )),
+            Section("Section 2", listOf(
+                Table(5, "Table 5"),
+                Table(6, "Table 6"),
+                Table(7, "Table 7"),
+                Table(8, "Table 8"),
+                Table(9, "Table 9")
+            ))
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        items(sections) { section ->
+            SectionItem(section)
+        }
+    }
+}
+
+@Composable
+fun DatabaseScreen(viewModel: TableViewModel) {
+    val tables by viewModel.allTables.observeAsState(initial = emptyList())
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        items(tables) { table ->
+            TableItem(table)
+        }
+    }
+}
+
 
 @Composable
 fun SectionItem(section: Section) {
@@ -100,7 +152,7 @@ fun SectionItem(section: Section) {
                     isExpanded = !isExpanded
                     section.isExpanded = isExpanded
                 }
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
